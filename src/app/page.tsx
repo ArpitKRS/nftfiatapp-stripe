@@ -27,6 +27,18 @@ export default function Home() {
 
   const stripe = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY as string)
 
+  const onClick = async() => {
+    const res = await fetch("/api/stripe-intent", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({buyerWalletAddress: account?.address}),
+    })
+    if(res.ok){
+      const json = await res.json();
+      setClientSecret(json.clientSecret);
+    }
+  }
+
   if(!account){
     return (
       <div style={{
@@ -74,6 +86,8 @@ export default function Home() {
         )}
         {!clientSecret ? (
           <button
+            onClick={onClick}
+            disabled={!account}
             style={{
               marginTop: "20px",
               padding: "1rem 2rem",
@@ -108,10 +122,35 @@ const CreditCardForm = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isComplete, setIsComplete] = useState<boolean>(false)
 
+  const onClick = async() => {
+    if(!stripe || !elements) return;
+
+    setIsLoading(true);
+    try {
+      const {paymentIntent, error} = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: "http://localhost:3000",
+        },
+        redirect: "if_required",
+      })
+
+      if(error) throw error.message;
+      if(paymentIntent.status === "succeeded"){
+        setIsComplete(true);
+        alert("Payment is complete!");
+      }
+      
+    } catch (error) {
+      alert("There was an error while processing your payment")
+    }
+  };
+
   return (
     <>
       <PaymentElement/>
       <button
+        onClick={onClick}
         disabled={isLoading || isComplete || !stripe || !elements}
         style={{
           marginTop: "20px",
